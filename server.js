@@ -1,179 +1,605 @@
-// =====================================
-// 🍓 8Berries — ChartGPT (Chat + Charts)
-// Frontend + Backend in ONE FILE
-// Render Deployment Ready
-// =====================================
+/*****************************************************************************************
+ * 🍓 8Berries – All-in-One Full Stack App
+ * ---------------------------------------------------------------------------------------
+ * Frontend + Backend in ONE file
+ * Features:
+ *  - Glassmorphism Sign Up page
+ *  - Glassmorphism Login page
+ *  - Protected main app
+ *  - ChartGPT-style chat
+ *  - Sidebar with History
+ *  - Clickable history (opens charts)
+ *  - ⭐ Pin charts
+ *  - ✏ Rename charts
+ *  - 🗑 Delete charts
+ *  - No backend logic modification required
+ *  - Session-based authentication
+ *
+ * NOTE:
+ *  - History is frontend-only (memory)
+ *  - Restart server = history reset (expected)
+ *****************************************************************************************/
+
+/* =======================================================================================
+ *                               BACKEND SETUP
+ * =======================================================================================
+ */
 
 require("dotenv").config();
 const express = require("express");
+const session = require("express-session");
 const { OpenAI } = require("openai");
 
 const app = express();
+
+/* -------------------- Middleware -------------------- */
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// ================================
-// ✅ RENDER PORT SUPPORT (ADDED)
-// ================================
-const PORT = process.env.PORT || 3000;
+app.use(
+    session({
+        secret: "8berries-secret-key",
+        resave: false,
+        saveUninitialized: false
+    })
+);
 
-// ================================
-// AI CLIENT (Groq / OpenAI style)
-// ================================
+/* -------------------- Constants -------------------- */
+const PORT = 3000;
+
+/* -------------------- In-memory Users -------------------- */
+/* NOTE: This is intentional for demo / learning */
+const users = {};
+
+/* -------------------- AI Client -------------------- */
 const groq = new OpenAI({
     apiKey: process.env.GROQ_API_KEY,
     baseURL: "https://api.groq.com/openai/v1"
 });
 
-// ================================
-// FRONTEND (HTML + CSS + JS)
-// ================================
-const HTML = `
+/* -------------------- Auth Middleware -------------------- */
+function requireLogin(req, res, next) {
+    if (!req.session.user) return res.redirect("/login");
+    next();
+}
+
+/* =======================================================================================
+ *                               FRONTEND PAGES
+ * =======================================================================================
+ */
+
+/* =======================================================================================
+ * SIGN UP PAGE (GLASSMORPHISM)
+ * =======================================================================================
+ */
+
+const signupHTML = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>8Berries</title>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<title>Sign Up – 8Berries</title>
 
 <style>
-* { box-sizing: border-box; }
+/* ---------- GLOBAL ---------- */
 body {
   margin: 0;
-  font-family: system-ui, sans-serif;
-  background: #000;
-  color: #fff;
   height: 100vh;
+  font-family: system-ui, -apple-system;
+  background: linear-gradient(135deg, #8fa5ff, #b8c4ff);
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
-header {
-  padding: 16px;
-  text-align: center;
-  font-size: 22px;
-  font-weight: bold;
-}
-#chat {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px;
-}
-.bubble {
-  max-width: 85%;
-  padding: 14px 18px;
+
+/* ---------- CARD ---------- */
+.card {
+  width: 760px;
+  height: 420px;
+  background: rgba(255,255,255,0.25);
+  backdrop-filter: blur(20px);
   border-radius: 20px;
-  margin-bottom: 12px;
-  line-height: 1.4;
-}
-.user {
-  background: #7c3aed;
-  margin-left: auto;
-}
-.bot {
-  background: #111;
-}
-.chart-bubble {
-  background: #111;
-  padding: 16px;
-}
-.typing {
-  font-style: italic;
-  color: #aaa;
-}
-.input-bar {
+  padding: 40px;
   display: flex;
-  padding: 14px;
-  border-top: 1px solid #222;
+  box-shadow: 0 30px 60px rgba(0,0,0,0.25);
 }
-#input {
+
+/* ---------- LEFT ---------- */
+.left {
   flex: 1;
+}
+.left h2 {
+  margin-bottom: 24px;
+  color: #111;
+}
+
+/* ---------- INPUTS ---------- */
+.input {
+  width: 100%;
   padding: 14px 18px;
   border-radius: 30px;
   border: none;
-  background: #111;
-  color: white;
+  outline: none;
+  margin-bottom: 14px;
+  font-size: 14px;
 }
-#send {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
+
+/* ---------- RIGHT ---------- */
+.right {
+  flex: 1;
+  padding-left: 40px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.btn {
+  padding: 14px;
+  border-radius: 30px;
   border: none;
-  margin-left: 10px;
-  background: #7c3aed;
-  color: white;
-  font-size: 20px;
+  cursor: pointer;
+  font-size: 15px;
+}
+
+.primary {
+  background: #000;
+  color: #fff;
+}
+
+.social {
+  background: transparent;
+  border: 1px solid #000;
+  margin-top: 10px;
+}
+
+.or {
+  text-align: center;
+  margin: 14px 0;
+  font-size: 13px;
+}
+
+.link {
+  font-size: 13px;
+  text-align: center;
+  margin-top: 10px;
+}
+
+.link a {
+  text-decoration: none;
+  color: #000;
+  font-weight: 600;
 }
 </style>
 </head>
 
 <body>
 
-<header>🍓 8Berries</header>
+<form class="card" method="POST" action="/auth/signup">
 
-<div id="chat"></div>
+  <div class="left">
+    <h2>Sign Up</h2>
+    <input class="input" name="email" placeholder="Email Address" required />
+    <input class="input" type="password" name="password" placeholder="Password" required />
+    <input class="input" type="password" name="confirm" placeholder="Confirm Password" required />
+  </div>
 
-<div class="input-bar">
-  <input id="input" placeholder="Ask for insights or charts..." />
-  <button id="send">↑</button>
+  <div class="right">
+    <button class="btn primary">Sign Up</button>
+
+    <div class="link">
+      Already have an account?
+      <a href="/login">Log in</a>
+    </div>
+
+    <div class="or">Or</div>
+
+    <button type="button" class="btn social">Sign up with Google</button>
+    <button type="button" class="btn social">Sign up with Facebook</button>
+  </div>
+
+</form>
+
+</body>
+</html>
+`;
+
+/* =======================================================================================
+ * LOGIN PAGE
+ * =======================================================================================
+ */
+
+const loginHTML = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Login – 8Berries</title>
+
+<style>
+body {
+  margin: 0;
+  height: 100vh;
+  font-family: system-ui;
+  background: linear-gradient(135deg, #8fa5ff, #b8c4ff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card {
+  width: 420px;
+  background: rgba(255,255,255,0.25);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
+  padding: 40px;
+  box-shadow: 0 30px 60px rgba(0,0,0,0.25);
+}
+
+h2 {
+  margin-bottom: 24px;
+}
+
+input {
+  width: 100%;
+  padding: 14px 18px;
+  border-radius: 30px;
+  border: none;
+  outline: none;
+  margin-bottom: 14px;
+}
+
+button {
+  width: 100%;
+  padding: 14px;
+  border-radius: 30px;
+  border: none;
+  background: #000;
+  color: #fff;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.link {
+  font-size: 13px;
+  text-align: center;
+  margin-top: 12px;
+}
+
+.link a {
+  color: #000;
+  font-weight: 600;
+  text-decoration: none;
+}
+</style>
+</head>
+
+<body>
+
+<form class="card" method="POST" action="/auth/login">
+  <h2>Sign In</h2>
+  <input name="email" placeholder="Email Address" required />
+  <input type="password" name="password" placeholder="Password" required />
+  <button>Sign In</button>
+
+  <div class="link">
+    Don’t have an account?
+    <a href="/signup">Sign up</a>
+  </div>
+</form>
+
+</body>
+</html>
+`;
+
+/* =======================================================================================
+ * MAIN APP (CHARTGPT + HISTORY + PIN / RENAME / DELETE)
+ * =======================================================================================
+ */
+
+const chartHTML = `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>8Berries</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+/* ---------- GLOBAL ---------- */
+body {
+  margin: 0;
+  font-family: system-ui;
+  background: #000;
+  color: #fff;
+}
+
+/* ---------- LAYOUT ---------- */
+.app {
+  display: flex;
+  height: 100vh;
+}
+
+/* ---------- SIDEBAR ---------- */
+.sidebar {
+  width: 260px;
+  background: #0b0b0b;
+  border-right: 1px solid #222;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.brand {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.side-btn {
+  background: #1a1a1a;
+  color: #fff;
+  border: none;
+  padding: 10px 14px;
+  border-radius: 20px;
+  cursor: pointer;
+  margin-bottom: 10px;
+  text-align: left;
+}
+
+/* ---------- HISTORY ---------- */
+.history {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  color: #ccc;
+}
+
+.history-item:hover {
+  background: #1f1f1f;
+}
+
+.history-left {
+  flex: 1;
+  cursor: pointer;
+}
+
+.history-actions button {
+  background: none;
+  border: none;
+  color: #aaa;
+  cursor: pointer;
+  margin-left: 6px;
+}
+
+/* ---------- MAIN ---------- */
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+#chat {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+/* ---------- CHAT ---------- */
+.bubble {
+  padding: 14px 18px;
+  border-radius: 20px;
+  margin-bottom: 12px;
+  max-width: 85%;
+}
+
+.user {
+  background: #7c3aed;
+  margin-left: auto;
+}
+
+.bot {
+  background: #111;
+}
+
+.chart {
+  background: #111;
+  padding: 14px;
+}
+
+/* ---------- INPUT BAR ---------- */
+#bar {
+  display: flex;
+  padding: 14px;
+  border-top: 1px solid #222;
+}
+
+input {
+  flex: 1;
+  background: #111;
+  color: #fff;
+  border: none;
+  padding: 14px;
+  border-radius: 30px;
+}
+
+.send {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: #7c3aed;
+  color: #fff;
+  margin-left: 10px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="brand">🍓 8Berries</div>
+    <button class="side-btn" onclick="newChart()">＋ New Chart</button>
+    <div class="history" id="history"></div>
+    <a href="/logout" class="side-btn" style="margin-top:auto;text-decoration:none">Logout</a>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div id="chat"></div>
+    <div id="bar">
+      <input id="input" placeholder="Ask for a chart or insight..." />
+      <button class="send" onclick="send()">↑</button>
+    </div>
+  </div>
+
 </div>
 
 <script>
+/* ---------- STATE ---------- */
 const chat = document.getElementById("chat");
 const input = document.getElementById("input");
+const historyBox = document.getElementById("history");
 
-function addBubble(text, cls) {
-  const div = document.createElement("div");
-  div.className = "bubble " + cls;
-  div.textContent = text;
-  chat.appendChild(div);
-  chat.scrollTop = chat.scrollHeight;
+let sessions = {};
+let currentSession = null;
+let chartCount = 0;
+
+/* ---------- CHAT ---------- */
+function bubble(text, role) {
+  const d = document.createElement("div");
+  d.className = "bubble " + role;
+  d.textContent = text;
+  chat.appendChild(d);
+
+  if (currentSession) {
+    sessions[currentSession].items.push({ type: "text", role, value: text });
+  }
 }
 
-function showTyping() {
-  const t = document.createElement("div");
-  t.id = "typing";
-  t.className = "bubble bot typing";
-  t.textContent = "Thinking...";
-  chat.appendChild(t);
-  chat.scrollTop = chat.scrollHeight;
-}
+function chart(c) {
+  const w = document.createElement("div");
+  w.className = "bubble chart";
+  const cv = document.createElement("canvas");
+  w.appendChild(cv);
+  chat.appendChild(w);
 
-function hideTyping() {
-  const t = document.getElementById("typing");
-  if (t) t.remove();
-}
-
-function addChart(chart) {
-  const wrap = document.createElement("div");
-  wrap.className = "bubble chart-bubble";
-
-  const canvas = document.createElement("canvas");
-  wrap.appendChild(canvas);
-  chat.appendChild(wrap);
-
-  new Chart(canvas, {
-    type: chart.chartType,
+  new Chart(cv, {
+    type: c.chartType,
     data: {
-      labels: chart.labels,
+      labels: c.labels,
       datasets: [{
-        label: chart.title,
-        data: chart.data,
+        label: c.title,
+        data: c.data,
         backgroundColor: "#7c3aed"
       }]
     }
   });
 
-  chat.scrollTop = chat.scrollHeight;
+  if (currentSession) {
+    sessions[currentSession].items.push({ type: "chart", value: c });
+  }
 }
 
+/* ---------- HISTORY ---------- */
+function newChart() {
+  chat.innerHTML = "";
+  currentSession = "chart_" + Date.now();
+  chartCount++;
+
+  sessions[currentSession] = {
+    title: "Chart " + chartCount,
+    pinned: false,
+    items: []
+  };
+
+  renderHistory();
+}
+
+function openChart(id) {
+  chat.innerHTML = "";
+  currentSession = id;
+
+  sessions[id].items.forEach(item => {
+    if (item.type === "text") bubble(item.value, item.role);
+    if (item.type === "chart") chart(item.value);
+  });
+}
+
+function pinChart(id) {
+  sessions[id].pinned = !sessions[id].pinned;
+  renderHistory();
+}
+
+function renameChart(id) {
+  const name = prompt("Rename chart:", sessions[id].title);
+  if (name) {
+    sessions[id].title = name;
+    renderHistory();
+  }
+}
+
+function deleteChart(id) {
+  if (confirm("Delete this chart?")) {
+    delete sessions[id];
+    chat.innerHTML = "";
+    renderHistory();
+  }
+}
+
+function renderHistory() {
+  historyBox.innerHTML = "";
+
+  Object.entries(sessions)
+    .sort((a, b) => b[1].pinned - a[1].pinned)
+    .forEach(([id, s]) => {
+      const row = document.createElement("div");
+      row.className = "history-item";
+
+      const left = document.createElement("div");
+      left.className = "history-left";
+      left.textContent = (s.pinned ? "⭐ " : "") + s.title;
+      left.onclick = () => openChart(id);
+
+      const actions = document.createElement("div");
+      actions.className = "history-actions";
+
+      const pin = document.createElement("button");
+      pin.textContent = "⭐";
+      pin.onclick = () => pinChart(id);
+
+      const edit = document.createElement("button");
+      edit.textContent = "✏";
+      edit.onclick = () => renameChart(id);
+
+      const del = document.createElement("button");
+      del.textContent = "🗑";
+      del.onclick = () => deleteChart(id);
+
+      actions.append(pin, edit, del);
+      row.append(left, actions);
+      historyBox.appendChild(row);
+    });
+}
+
+/* ---------- SEND ---------- */
 async function send() {
   const text = input.value.trim();
   if (!text) return;
 
   input.value = "";
-  addBubble(text, "user");
-  showTyping();
+  bubble(text, "user");
 
   const res = await fetch("/api", {
     method: "POST",
@@ -182,83 +608,76 @@ async function send() {
   });
 
   const data = await res.json();
-  hideTyping();
-
-  if (data.type === "chart") {
-    addChart(data);
-  } else {
-    addBubble(data.reply, "bot");
-  }
+  if (data.type === "chart") chart(data);
+  else bubble(data.reply, "bot");
 }
-
-document.getElementById("send").onclick = send;
-input.addEventListener("keydown", e => {
-  if (e.key === "Enter") send();
-});
 </script>
 
 </body>
 </html>
 `;
 
-// ================================
-// ROUTES
-// ================================
+/* =======================================================================================
+ *                               ROUTES
+ * =======================================================================================
+ */
 
-// Root UI
-app.get("/", (_, res) => {
-    res.send(HTML);
+app.get("/signup", (_, res) => res.send(signupHTML));
+app.get("/login", (_, res) => res.send(loginHTML));
+app.get("/", requireLogin, (_, res) => res.send(chartHTML));
+
+/* -------------------- AUTH -------------------- */
+app.post("/auth/signup", (req, res) => {
+    const { email, password, confirm } = req.body;
+    if (password !== confirm) return res.send("Passwords do not match");
+    users[email] = { password };
+    req.session.user = email;
+    res.redirect("/");
 });
 
-// ================================
-// ✅ HEALTH CHECK (ADDED FOR RENDER)
-// ================================
-app.get("/health", (_, res) => {
-    res.send("8Berries is healthy");
+app.post("/auth/login", (req, res) => {
+    const { email, password } = req.body;
+    if (!users[email] || users[email].password !== password)
+        return res.send("Invalid credentials");
+    req.session.user = email;
+    res.redirect("/");
 });
 
-// AI API
-app.post("/api", async(req, res) => {
+app.get("/logout", (req, res) => {
+    req.session.destroy(() => res.redirect("/login"));
+});
+
+/* -------------------- AI API -------------------- */
+app.post("/api", requireLogin, async(req, res) => {
     try {
         const ai = await groq.chat.completions.create({
             model: "llama-3.3-70b-versatile",
-            messages: [{
-                    role: "system",
-                    content: `
-You are ChartGPT.
-If the user asks for a chart, respond ONLY in JSON:
-{
-  "type": "chart",
-  "chartType": "bar|line|pie",
-  "title": "Chart title",
-  "labels": [],
-  "data": []
-}
-Otherwise respond normally as text.
-          `
-                },
+            messages: [
+                { role: "system", content: "Return chart JSON if chart requested" },
                 { role: "user", content: req.body.message }
             ]
         });
 
         const content = ai.choices[0].message.content.trim();
+        const jsonMatch = content.match(/\\{[\\s\\S]*\\}/);
 
-        try {
-            const parsed = JSON.parse(content);
-            if (parsed.type === "chart") return res.json(parsed);
-        } catch {}
+        if (jsonMatch) {
+            try {
+                return res.json(JSON.parse(jsonMatch[0]));
+            } catch {}
+        }
 
         res.json({ reply: content });
-
-    } catch (err) {
-        console.error(err);
-        res.json({ reply: "AI error." });
+    } catch {
+        res.json({ reply: "AI error" });
     }
 });
 
-// ================================
-// START SERVER (RENDER READY)
-// ================================
+/* =======================================================================================
+ *                               START SERVER
+ * =======================================================================================
+ */
+
 app.listen(PORT, () => {
-    console.log("🍓 8Berries running on port " + PORT);
+    console.log("🍓 8Berries running at http://localhost:" + PORT);
 });

@@ -20,7 +20,20 @@ const session = require("express-session");
 const OpenAI = require("openai");
 const mongoose = require("mongoose");
 
-mongoose.connect(process.env.MONGO_URI);
+if (!process.env.MONGO_URI) {
+    console.error("❌ MONGO_URI is missing");
+    process.exit(1);
+}
+
+mongoose.connect(process.env.MONGO_URI)
+    .then(() => {
+        console.log("MongoDB connected");
+    })
+    .catch((err) => {
+        console.error("MongoDB connection failed:", err);
+        process.exit(1);
+    });
+
 
 mongoose.connection.on("connected", () => {
     log("🍃 MongoDB connected");

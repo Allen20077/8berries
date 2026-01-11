@@ -1172,5 +1172,5 @@ app.use("/uploads", express.static("uploads"));
  */
 
 app.listen(PORT, () => {
-    console.log("🍓 8Berries running at http://localhost:" + PORT);
+    console.log(`🍓 Server running on port ${PORT}`);
 });

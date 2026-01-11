@@ -6,7 +6,15 @@
 /* jshint esversion: 2020 */
 
 require("dotenv").config();
-console.log("🔑 GROQ KEY LOADED:", !!process.env.GROQ_API_KEY);
+const isProd = process.env.NODE_ENV === "production";
+
+function log(...args) {
+    if (!isProd) {
+        console.log(...args);
+    }
+}
+
+log("🔑 GROQ KEY LOADED:", !!process.env.GROQ_API_KEY);
 const express = require("express");
 const session = require("express-session");
 const OpenAI = require("openai");
@@ -15,7 +23,7 @@ const mongoose = require("mongoose");
 mongoose.connect(process.env.MONGO_URI);
 
 mongoose.connection.on("connected", () => {
-    console.log("🍃 MongoDB connected");
+    log("🍃 MongoDB connected");
 });
 
 mongoose.connection.on("error", (err) => {
@@ -105,26 +113,26 @@ const groq = new OpenAI({
 });
 
 /* -------------------- Google OAuth Strategy -------------------- */
-passport.use(
-    new GoogleStrategy({
-            clientID: process.env.GOOGLE_CLIENT_ID,
-            clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-            callbackURL: "/auth/google/callback"
-        },
-        (accessToken, refreshToken, profile, done) => {
-            let email;
-            if (profile.emails && profile.emails.length > 0) {
-                email = profile.emails[0].value;
-            } else {
-                email = profile.id + "@google.com";
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+    passport.use(
+        new GoogleStrategy({
+                clientID: process.env.GOOGLE_CLIENT_ID,
+                clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+                callbackURL: "/auth/google/callback"
+            },
+            (accessToken, refreshToken, profile, done) => {
+                let email;
+                if (profile.emails && profile.emails.length > 0) {
+                    email = profile.emails[0].value;
+                } else {
+                    email = profile.id + "@google.com";
+                }
+
+                done(null, { email });
             }
-            if (!users[email]) {
-                users[email] = { password: null, googleId: profile.id };
-            }
-            done(null, { email });
-        }
-    )
-);
+        )
+    );
+}
 
 /* -------------------- Auth Middleware -------------------- */
 function requireLogin(req, res, next) {
@@ -1172,5 +1180,5 @@ app.use("/uploads", express.static("uploads"));
  */
 
 app.listen(PORT, () => {
-    console.log(`🍓 Server running on port ${PORT}`);
+    log(`🍓 Server running on port ${PORT}`);
 });
